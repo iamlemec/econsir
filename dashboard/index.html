@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<title>econsir.io</title>
+
+<link type="text/css" rel="stylesheet" href="{{ static_url('dashboard.css') }}"/>
+
+</head>
+
+<body>
+
+<div id="options">
+
+<div class="option-head">Policy</div>
+
+<div class="option-list">
+
+<div class="option-item option-item-range">
+<div class="option-label">Lockdown activity<span class="info-button" info="Activity level imposed by lockdown when in place. Higher number means weaker lockdown."><img class="info-icon" src="static/info-icon.svg"></span>: <span class="display-input"></span>%</div>
+<div class="option-group">
+<span class="input-bound left-bound">0</span>
+<input type="range" id="pol-act" class="option-input option-slide option-number" min="0" max="100" step="5" value="45">
+<span class="input-bound right-bound">100</span>
+</div>
+</div>
+
+<div class="option-item option-item-range">
+<div class="option-label">Lockdown trigger<span class="info-button" info="Daily case rate (per million) at county level over which lockdown is imposed."><img class="info-icon" src="static/info-icon.svg"></span>: <span class="display-input"></span> cases/m</div>
+<div class="option-group">
+<span class="input-bound left-bound">0</span>
+<input type="range" id="pol-cut" class="option-input option-slide option-number" min="0" max="500" step="10" value="10">
+<span class="input-bound right-bound">500</span>
+</div>
+</div>
+
+<div class="option-item option-item-date">
+<div class="option-label">Implement date<span class="info-button" info="Date at which chosen policy is implemented. Prior policy is taken from data."><img class="info-icon" src="static/info-icon.svg"></span>: <span class="display-input"></span></div>
+<div class="option-group">
+<span class="input-bound left-bound">0</span>
+<input type="range" id="pol-lag" class="option-input option-slide option-date" min="0" max="686" step="1" value="100">
+<span class="input-bound right-bound">2022</span>
+</div>
+</div>
+
+</div>
+
+<div class="option-head">Options</div>
+
+<div class="option-list">
+
+<div class="option-item option-item-check">
+<input type="checkbox" id="opt-tcase" class="option-input option-check" />
+<label for="opt-tcase">True cases</label><span class="info-button" info="Show true underlying infection rates rather than number which would have been reported."><img class="info-icon" src="static/info-icon.svg"></span>
+</div>
+
+<div class="option-item option-item-check">
+<input type="checkbox" id="opt-kzone" class="option-input option-check" checked />
+<label for="opt-kzone">Eradication</label><span class="info-button" info="Below a certain threshold (about 10/m daily) cases hit hard zero, rather than some very small number."><img class="info-icon" src="static/info-icon.svg"></span>
+</div>
+
+<div class="option-item option-item-check">
+<input type="checkbox" id="opt-vax" class="option-input option-check" />
+<label for="opt-vax">Vaccine</label><span class="info-button" info="Introduce a vaccine in June of 2021 with 2m people vaccinated daily."><img class="info-icon" src="static/info-icon.svg"></span>
+</div>
+
+</div>
+
+<div class="option-head">Profiles</div>
+
+<div class="option-list">
+
+<span class="option-item option-item-button">
+<input type="button" id="prof-smash" class="option-input option-button" value="Smash"/>
+</span>
+
+<span class="option-item option-item-button">
+<input type="button" id="prof-erad" class="option-input option-button" value="Eradicate"/>
+</span>
+
+<span class="option-item option-item-button">
+<input type="button" id="prof-flat" class="option-input option-button" value="Flatten"/>
+</span>
+
+<span class="option-item option-item-button">
+<input type="button" id="prof-lfaire" class="option-input option-button" value="Laissez faire"/>
+</span>
+
+<span class="option-item option-item-button">
+<input type="button" id="prof-vax" class="option-input option-button" value="Vaccine"/>
+</span>
+</div>
+
+</div>
+
+<div id="main">
+
+<div id="header">
+<span id="title">Econ-SIR Dashboard</span>
+</div>
+
+<div id="chart-box"></div>
+
+</div>
+
+<div id="popup"></div>
+
+<script type="text/javascript" src="{{ static_url('vega-5.js') }}"></script>
+<script type="text/javascript" src="{{ static_url('vega-lite-4.8.1.js') }}"></script>
+<script type="text/javascript" src="{{ static_url('vega-embed-6.js') }}"></script>
+<script type="text/javascript" src="{{ static_url('jquery-3.5.1.min.js') }}"></script>
+<script type="text/javascript" src="{{ static_url('dashboard.js') }}"></script>
+
+</body>
+
+</html>

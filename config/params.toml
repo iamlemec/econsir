@@ -1,0 +1,33 @@
+# epi rates
+"β" = 0.5
+"γ" = 0.1
+"λ" = 0.05
+"δ" = 0.07
+"κ" = 0.0005
+
+# utility
+"ψ" = 500.0
+"σ" = 0.3
+
+# behavioral
+"ρ" = 0.15
+zi = 1.5
+
+# testing
+p0 = 0.1
+pr = 0.01
+
+# initial state
+i0 = 1.0
+
+# time varying
+"β0" = 1.0
+"βr" = 0.0
+"ψ0" = 1.0
+"ψr" = 0.0
+
+# measurement error
+"σc" = 10
+"σd" = 5
+"σa" = 10
+"σo" = 20

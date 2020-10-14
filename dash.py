@@ -23,7 +23,7 @@ from jax.scipy.special import ndtri
 
 ap = argparse.ArgumentParser(description='Econ-SIR dashboard server')
 ap.add_argument('--port', type=int, default=80, help='port to serve on')
-ap.add_argument('--params', type=str, default='config/params.toml', help='parameter set to use')
+ap.add_argument('--params', type=str, default='config/params_estim.toml', help='parameter set to use')
 args = ap.parse_args()
 
 # time period
@@ -45,8 +45,6 @@ state = md.zero_state(params)
 ##
 ## simulate!
 ##
-
-gen_jit = jax.jit(md.gen_path, static_argnums=(2, 3))
 
 def sim_policy(act, cut, lag, tcase, kzone, vax):
     σ = params['σ']
@@ -84,7 +82,7 @@ def sim_policy(act, cut, lag, tcase, kzone, vax):
         'kz': kzon_vec,
         'vx': vax_vec,
     }
-    simul = gen_jit(params, policy, state, T)
+    simul = md.gen_jit(params, policy, state, T)
 
     # maybe swap in true cases
     if tcase:
@@ -119,13 +117,10 @@ class PolicyHandler(tornado.web.RequestHandler):
         print(f'sim_policy: {t1-t0}')
 
         # render output
-        ch_c, ch_d, ch_a, ch_o = vz.outcome_summary(sim_df, c_lim=500, d_lim=12)
-        ch = alt.vconcat(
-            alt.hconcat(ch_c, ch_d, spacing=20),
-            alt.hconcat(ch_a, ch_o, spacing=20),
-            spacing=40,
+        ch = vz.outcome_summary(
+            sim_df, c_lim=500, d_lim=12,
+            hspacing=20, vspacing=40, color='#bbbbbb',
         )
-        ch = ch.configure_axisY(minExtent=30, labelFlush=True)
 
         # send off vega json
         js = ch.to_json()
@@ -138,8 +133,8 @@ handlers = [
 ]
 app = tornado.web.Application(
     handlers,
-    static_path='dashboard',
-    template_path='dashboard',
+    static_path='dash',
+    template_path='dash',
     debug=True,
 )
 app.listen(args.port)

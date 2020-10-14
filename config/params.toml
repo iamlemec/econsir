@@ -1,3 +1,7 @@
+##
+## simulation
+##
+
 # epi rates
 "β" = 0.5
 "γ" = 0.1
@@ -26,8 +30,17 @@ i0 = 1.0
 "ψ0" = 1.0
 "ψr" = 0.0
 
+##
+## estimation
+##
+
 # measurement error
-"σc" = 10
-"σd" = 5
+"σc" = 25
+"σd" = 1
 "σa" = 10
-"σo" = 20
+"σo" = 10
+
+# lockdown levels
+zb1 = 0.8
+zb2 = 0.9
+zb3 = 1.0

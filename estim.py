@@ -1,7 +1,10 @@
 import jax
 import jax.numpy as np
 
-from tools import trans_args, rtrans_args, rmsprop, adam, gaussian_err
+import pandas as pd
+
+from model import zero_state, gen_path
+from tools import load_args, save_args, trans_args, rtrans_args, rmsprop, adam, gaussian_err
 
 ##
 ## estimation
@@ -27,23 +30,27 @@ spec_params = {
     'zi': 'log',
     'zb1': 'log',
     'zb2': 'log',
+    'zb3': 'log',
     'σc': 'log',
     'σd': 'log',
     'σa': 'log',
     'σo': 'log',
 }
 
-def calc_policy(pol1, pol2, zb1, zb2):
-    return pol1*(1-pol2)*zb1 + pol2*zb2
+# map from policy data to z levels
+def calc_policy(pol1, pol2, pol3, zb1, zb2, zb3):
+    return pol1*(1-pol2)*(1-pol3)*zb1 + pol2*(1-pol3)*zb2 + pol3*zb3
 
-def likelihood(params, data):
+def likelihood(par, dat, T):
     st0 = zero_state(par)
-    zb0 = calc_policy(data['pol1'], data['pol2'], params['zb1'], params['zb2'])
+    zb0 = calc_policy(
+        dat['pol1'], dat['pol2'], dat['pol3'],
+        par['zb1'], par['zb2'], par['zb3'],
+    )
 
     # run simulation
-    par = params.copy()
     pol = {'zb': zb0, 'zc': 0, 'kz': 0, 'vx': 0}
-    sim = gen_path(par, pol, st0, data['T'])
+    sim = gen_path(par, pol, st0, T)
 
     # extract simulation
     sim_c = 1e6*sim['c']
@@ -52,10 +59,10 @@ def likelihood(params, data):
     sim_o = 1e2*sim['out']
 
     # extract data
-    dat_c = 1e6*data['c']
-    dat_d = 1e6*data['d']
-    dat_a = 1e2*data['act']
-    dat_o = 1e2*data['out']
+    dat_c = 1e6*dat['c']
+    dat_d = 1e6*dat['d']
+    dat_a = 1e2*dat['act']
+    dat_o = 1e2*dat['out']
 
     # get daily rates
     sim_c = np.diff(sim_c)
@@ -86,7 +93,15 @@ def print_params(j, val, par):
     pstr = ', '.join(f'{k}={np.mean(v):.4f}' for k, v in par.items())
     print(f'[{j:5d}] {val:.4f}: {pstr}')
 
-def estimate(data, par0, hard_params={}, optim='adam', **kwargs):
+def estimate(dat='data/usa.csv', par='config/params.toml', save=None, T=None, hard_params={}, optim='adam', **kwargs):
+    if type(dat) is str:
+        dat = load_data(dat)
+    if type(dat) is pd.DataFrame:
+        T = len(dat)
+        dat = {k: np.array(v) for k, v in dat.items()}
+    if type(par) is str:
+        par = load_args(par)
+
     if optim == 'rmsprop':
         opter = rmsprop
     elif optim == 'adam':
@@ -94,7 +109,7 @@ def estimate(data, par0, hard_params={}, optim='adam', **kwargs):
 
     def objective(lpar):
         par = trans_args(lpar, spec_params, hard_params)
-        return like_gradval(par, data)
+        return likelihood(par, dat, T)
 
     def printer(j, val, lpar):
         par = trans_args(lpar, spec_params, hard_params)
@@ -105,11 +120,14 @@ def estimate(data, par0, hard_params={}, optim='adam', **kwargs):
     obj_gradval = jax.jit(obj_gradval0)
 
     # so we don't waste time on gradients
-    par0 = {k: v for k, v in par0.items() if k not in hard_params}
+    par0 = {k: v for k, v in par.items() if k not in hard_params}
     lpar0 = rtrans_args(par0, spec_params)
 
     # run the optimizer
-    lpar1 = opter(objective, lpar0, disp=printer, **kwargs)
+    lpar1 = opter(obj_gradval, lpar0, disp=printer, **kwargs)
     par1 = trans_args(lpar1, spec_params, hard_params)
+
+    if save is not None:
+        save_args(par1, save)
 
     return par1

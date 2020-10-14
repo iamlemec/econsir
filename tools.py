@@ -112,7 +112,7 @@ def clip2(x, c):
     return np.clip(x, -c, c)
 
 # RMSprop gradient maximizer
-def rmsprop(gradval, params, eta=0.01, gamma=0.9, eps=1e-8, R=10000, per=1000, disp=None):
+def rmsprop(gradval, params, eta=0.01, gamma=0.9, eps=1e-8, R=500, per=100, disp=None):
     params = {k: np.array(v) for k, v in params.items()}
     grms = {k: np.zeros_like(v) for k, v in params.items()}
     n = len(params)
@@ -139,7 +139,7 @@ def rmsprop(gradval, params, eta=0.01, gamma=0.9, eps=1e-8, R=10000, per=1000, d
     return params
 
 # Adam gradient maximizer
-def adam(gradval, params, eta=0.01, beta1=0.9, beta2=0.9, eps=1e-7, c=0.01, R=10000, per=1000, disp=None, log=False):
+def adam(gradval, params, eta=0.01, beta1=0.9, beta2=0.9, eps=1e-7, c=0.01, R=500, per=100, disp=None, log=False):
     params = {k: np.array(v) for k, v in params.items()}
     gavg = {k: np.zeros_like(v) for k, v in params.items()}
     grms = {k: np.zeros_like(v) for k, v in params.items()}
@@ -193,6 +193,6 @@ eps = 1e-10
 def log(x):
     return np.log(np.maximum(eps, x))
 
-def gaussian_err0(dat, sim, sig):
+def gaussian_err(dat, sim, sig):
     lik = - log(sig) - 0.5*((dat-sim)/sig)**2
     return np.mean(lik)

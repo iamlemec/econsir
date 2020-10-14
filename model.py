@@ -3,7 +3,9 @@ import jax.lax as lax
 import jax.numpy as np
 from jax.scipy.special import ndtr
 
-from tools import log, eps
+import pandas as pd
+
+from tools import load_args, log, eps
 
 # β - transmission rate
 # λ - infection rate
@@ -40,7 +42,7 @@ def killzone(x, k, eps=1e-6):
     return smoothstep(1e6*x/(2*(k+eps)))
 
 # core SIR model
-def sir(par, pol, st, tv):
+def sir(par, st, tv):
     # current state
     s = st['s']
     a = st['a']
@@ -177,7 +179,7 @@ def gen_path(par, pol, st0, T):
         'vx': pol['vx']*np.ones(T),
     }
 
-    sf = jax.partial(sir, par, pol)
+    sf = jax.partial(sir, par)
     last, path = lax.scan(sf, st0, tv)
 
     return {k: v.T for k, v in path.items()}
@@ -186,15 +188,43 @@ def gen_path(par, pol, st0, T):
 def zero_state(par):
     i = par['i0']/1e6
     ϝ = np.maximum(0, (par['β']+par['δ']+par['κ']-par['λ']-par['γ'])/par['λ'])
+    p0 = par['p0']
     return {
         's': 1.0 - (1+ϝ)*i,
         'a': ϝ*i,
         'i': i,
         'r': 0.0,
         'd': 0.0,
-        'c': i,
+        'c': p0*i,
         'ka': ϝ*i,
         'ki': i,
         'e': 1.0,
         't': 0.0,
     }
+
+# compiled simulator
+gen_jit = jax.jit(gen_path, static_argnums=(3,))
+
+# default policy
+pol0 = {
+    'zb': 0.0,
+    'zc': 0.0,
+    'kz': 0.0,
+    'vx': 0.0,
+}
+
+# simple interface
+def simulate_path(par='config/params.toml', pol={}, st0=None, T=365, date='2020-02-15', frame=True):
+    if type(par) is str:
+        par = load_args(par)
+    if st0 is None:
+        st0 = zero_state(par)
+    pol = {**pol0, **pol}
+
+    sim = gen_jit(par, pol, st0, T)
+
+    if frame:
+        index = pd.date_range(date, periods=T, freq='d', name='date')
+        return pd.DataFrame(sim, index=index)
+    else:
+        return sim

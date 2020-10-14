@@ -1,0 +1,6 @@
+numpy
+pandas
+jax
+jaxlib
+altair
+tornado

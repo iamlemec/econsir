@@ -9,16 +9,14 @@ import altair as alt
 
 neon_blue = '#1e88e5'
 neon_red = '#ff0d57'
-
 fg_color = '#bbbbbb'
-bg_color = '#212121'
 
 ##
 ## config
 ##
 
 config = {
-    'background': 'none',
+    'background': 'transparent',
 
     'view': {
         'strokeWidth': 0,
@@ -26,21 +24,14 @@ config = {
 
     'axis': {
         'grid': False,
-        'domainColor': fg_color,
-        'tickColor': fg_color,
         'titleFontSize': 14,
         'labelFontSize': 14,
-        'labelColor': fg_color,
     },
 
     'legend': {
         'titleFontSize': 14,
         'labelFontSize': 14,
     },
-
-    'title': {
-        'color': fg_color,
-    }
 }
 
 alt.themes.register('clean', lambda: {'config': config})
@@ -69,8 +60,10 @@ def plot_path(s, title=None, y_max=None):
 
     return ch
 
-def outcome_summary(df, c_lim=0, d_lim=0, ao_lim=110, ao_base=True):
-    c = 1e6*df['c'].diff()
+def outcome_summary(df, c_lim=0, d_lim=0, ao_lim=110, ao_base=True, tcase=False, color='black', hspacing=10, vspacing=20):
+    c_var = 'ki' if tcase else 'c'
+
+    c = 1e6*df[c_var].diff()
     d = 1e6*df['d'].diff()
     a = 1e2*df['act']
     o = 1e2*df['out']
@@ -88,7 +81,7 @@ def outcome_summary(df, c_lim=0, d_lim=0, ao_lim=110, ao_base=True):
 
         a_base = pd.DataFrame({'base': base}, index=a.index).reset_index()
         ch_ab = alt.Chart(a_base).mark_line(
-            strokeDash=[5, 2], strokeWidth=1, color=fg_color
+            strokeDash=[5, 2], strokeWidth=1, color=color
         ).encode(
             x='date', y='base'
         )
@@ -96,10 +89,20 @@ def outcome_summary(df, c_lim=0, d_lim=0, ao_lim=110, ao_base=True):
 
         o_base = pd.DataFrame({'base': base}, index=o.index).reset_index()
         ch_ob = alt.Chart(o_base).mark_line(
-            strokeDash=[5, 2], strokeWidth=1, color=fg_color
+            strokeDash=[5, 2], strokeWidth=1, color=color
         ).encode(
             x='date', y='base'
         )
         ch_o += ch_ob
 
-    return ch_c, ch_d, ch_a, ch_o
+    ch = alt.vconcat(
+        alt.hconcat(ch_c, ch_d, spacing=hspacing),
+        alt.hconcat(ch_a, ch_o, spacing=hspacing),
+        spacing=vspacing,
+    )
+
+    ch = ch.configure_title(color=color)
+    ch = ch.configure_axis(domainColor=color, tickColor=color, labelColor=color)
+    ch = ch.configure_axisY(minExtent=30, labelFlush=True)
+
+    return ch

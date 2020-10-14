@@ -8,3 +8,6 @@ To run the built-in dashboard, execute
 ```
 python3 dash.py
 ```
+
+Here's an example of a generated path
+![simulated path](simul.svg)

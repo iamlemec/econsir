@@ -3,8 +3,8 @@ import jax.numpy as np
 
 import pandas as pd
 
-from model import zero_state, gen_path
-from tools import load_args, save_args, trans_args, rtrans_args, rmsprop, adam, gaussian_err
+from .model import zero_state, gen_path
+from .tools import load_args, save_args, trans_args, rtrans_args, rmsprop, adam, gaussian_err
 
 ##
 ## estimation
@@ -93,7 +93,7 @@ def print_params(j, val, par):
     pstr = ', '.join(f'{k}={np.mean(v):.4f}' for k, v in par.items())
     print(f'[{j:5d}] {val:.4f}: {pstr}')
 
-def estimate(dat='data/usa.csv', par='config/params.toml', save=None, T=None, hard_params={}, optim='adam', **kwargs):
+def estimate(dat, par, save=None, T=None, hard_params={}, optim='adam', **kwargs):
     if type(dat) is str:
         dat = load_data(dat)
     if type(dat) is pd.DataFrame:

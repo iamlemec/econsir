@@ -1,7 +1,5 @@
 import jax
-import tools as tl
-import model as md
-import viz as vz
+import econsir as es
 
 import toml
 import time
@@ -23,7 +21,7 @@ from jax.scipy.special import ndtri
 
 ap = argparse.ArgumentParser(description='Econ-SIR dashboard server')
 ap.add_argument('--port', type=int, default=80, help='port to serve on')
-ap.add_argument('--params', type=str, default='config/params_estim.toml', help='parameter set to use')
+ap.add_argument('--params', type=str, default='params/estim.toml', help='parameter set to use')
 args = ap.parse_args()
 
 # time period
@@ -37,10 +35,10 @@ vax_time = 365
 vax_rate = 2/330
 
 # estimated params
-params = tl.load_args(args.params)
+params = es.load_args(args.params)
 
 # initial state
-state = md.zero_state(params)
+state = es.zero_state(params)
 
 ##
 ## simulate!
@@ -82,7 +80,7 @@ def sim_policy(act, cut, lag, tcase, kzone, vax):
         'kz': kzon_vec,
         'vx': vax_vec,
     }
-    simul = md.gen_jit(params, policy, state, T)
+    simul = es.gen_jit(params, policy, state, T)
 
     # maybe swap in true cases
     if tcase:
@@ -117,7 +115,7 @@ class PolicyHandler(tornado.web.RequestHandler):
         print(f'sim_policy: {t1-t0}')
 
         # render output
-        ch = vz.outcome_summary(
+        ch = es.outcome_summary(
             sim_df, c_lim=500, d_lim=12,
             hspacing=20, vspacing=40, color='#bbbbbb',
         )

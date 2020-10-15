@@ -1,8 +1,8 @@
 import jax
 import jax.numpy as np
 
-from model import gen_path, gen_jit, pol0
-from tools import trans_args, rtrans_args, adam, rmsprop
+from .model import gen_path, gen_jit, pol0
+from .tools import trans_args, rtrans_args, adam, rmsprop
 
 ##
 ## constants
@@ -64,7 +64,7 @@ def print_policy(j, val, pol):
     pstr = ', '.join(f'{k}={np.mean(v):.4f}' for k, v in pol.items())
     print(f'[{j:5d}] {val:.4f}: {pstr}')
 
-def optimal_policy(pol, par, st0, T, disc=0.05, long_run=False, hard_policy=hard_default, optim='adam', **kwargs):
+def optimal_policy(pol, par, st0, T=365, disc=0.05, long_run=False, hard_policy=hard_default, optim='adam', **kwargs):
     if optim == 'rmsprop':
         opter = rmsprop
     elif optim == 'adam':

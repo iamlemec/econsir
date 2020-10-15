@@ -5,7 +5,7 @@ from jax.scipy.special import ndtr
 
 import pandas as pd
 
-from tools import load_args, log, eps
+from .tools import load_args, log, eps
 
 # β - transmission rate
 # λ - infection rate
@@ -214,13 +214,13 @@ pol0 = {
 }
 
 # simple interface
-def simulate_path(par='config/params.toml', pol={}, st0=None, T=365, date='2020-02-15', frame=True):
+def simulate_path(par, pol={}, st0=None, T=365, date='2020-02-15', frame=True):
     if type(par) is str:
         par = load_args(par)
     if st0 is None:
         st0 = zero_state(par)
-    pol = {**pol0, **pol}
 
+    pol = {**pol0, **pol}
     sim = gen_jit(par, pol, st0, T)
 
     if frame:

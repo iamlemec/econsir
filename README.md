@@ -18,4 +18,4 @@ python3 dash.py
 
 Here's an example of a simulated path
 
-![simulated path](simul.svg)
+![simulated path](output/simul.svg)

@@ -243,6 +243,6 @@ def simulate_path(par, pol={}, st0=None, imp=None, K=10, T=365, locs=None, date=
     if frame:
         index = pd.date_range(date, periods=T, freq='d', name='date')
         columns = np.arange(K) if locs is None else locs
-        return framify(sim, index, columns), last
-    else:
-        return sim, last
+        sim = framify(sim, index, columns)
+
+    return sim, last

@@ -124,7 +124,7 @@ def gen_quantiles(s, quants=9, qmin=0.05, qmax=0.4):
 
     return qpairs, qvals
 
-def path_dist(s, wgt=None, y_max=None, title=None, quants=5):
+def path_dist(s, wgt=None, y_max=None, color='black', title=None, quants=5):
     if y_max is None:
         y_args = {}
     else:
@@ -161,7 +161,7 @@ def path_dist(s, wgt=None, y_max=None, title=None, quants=5):
 
     return chs
 
-def outcome_summary(df, c_lim=0, d_lim=0, ao_lim=110, ao_base=True, tcase=False, split=False, color='black', **kwargs):
+def outcome_summary(df, c_lim=0, d_lim=0, ao_lim=110, ao_base=True, tcase=False, color='black', hspacing=20, vspacing=20, **kwargs):
     c_var = 'ki' if tcase else 'c'
 
     c = 1e6*df[c_var].diff()
@@ -196,14 +196,14 @@ def outcome_summary(df, c_lim=0, d_lim=0, ao_lim=110, ao_base=True, tcase=False,
         )
         ch_o += ch_ob
 
-    if split:
-        return ch_c, ch_d, ch_a, ch_o
-    else:
-        ch = alt.vconcat(
-            alt.hconcat(ch_c, ch_d, spacing=20),
-            alt.hconcat(ch_a, ch_o, spacing=20),
-            spacing=20,
-        )
-        ch = ch.configure_axisY(minExtent=40, labelFlush=True)
-        ch = ch.configure_axis(domainColor=color, tickColor=color)
-        return ch
+    ch = alt.vconcat(
+        alt.hconcat(ch_c, ch_d, spacing=hspacing),
+        alt.hconcat(ch_a, ch_o, spacing=hspacing),
+        spacing=vspacing,
+    )
+
+    ch = ch.configure_axisY(minExtent=40, labelFlush=True)
+    ch = ch.configure_axis(domainColor=color, tickColor=color, labelColor=color)
+    ch = ch.configure_title(color=color)
+
+    return ch

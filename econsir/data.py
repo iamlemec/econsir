@@ -48,7 +48,7 @@ def nan_filter(df, idx, col, thresh=0):
 ## data loader
 ##
 
-def load_data(path, cutoff=1e-6, lag=10, smooth=7, winsor=0.05, min_out=0.2, min_pop=50_000, min_date='2020-02-01', max_date=None):
+def load_data(path, cutoff=1e-6, lag=10, smooth=7, winsor=0.05, min_out=0.2, min_pop=50_000, min_date='2020-02-15', max_date=None):
     dtype = {
         'county_fips': 'str', 'pop': 'Int64', 'cases_cum': 'Int64',
         'deaths_cum': 'Int64', 'policy1': 'boolean', 'policy2': 'boolean',

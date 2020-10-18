@@ -15,30 +15,46 @@ import tornado.web
 
 from jax.scipy.special import ndtri
 
-##
-## command line arguments
-##
-
+# command line arguments
 ap = argparse.ArgumentParser(description='Econ-SIR dashboard server')
 ap.add_argument('--port', type=int, default=80, help='port to serve on')
 ap.add_argument('--params', type=str, default='params/estim.toml', help='parameter set to use')
+ap.add_argument('--data', type=str, default='data/panel_usa.csv', help='data file to use')
 args = ap.parse_args()
-
-# time period
-base_date = '2020-02-15'
-T = 686
-dates = pd.date_range(base_date, periods=T, freq='d', name='date')
 
 # static params
 kill_zone = 400
 vax_time = 365
 vax_rate = 2/330
 
+# time path
+T = 686
+t_vec = np.arange(T)[:, None]
+
+# generate dates
+base_date = '2020-02-15'
+dates = pd.date_range(base_date, periods=T, freq='d', name='date')
+
+# load data
+data = es.load_data(args.data, min_date=base_date)
+T0, K = data['T'], data['K']
+fips = data['fips']
+extrap = lambda x, v: np.concatenate([x, v*np.ones((T-T0, K))], axis=0)
+
 # estimated params
 params = es.load_args(args.params)
 
-# initial state
-state = es.zero_state(params)
+# state path
+state = es.zero_state(K)
+impul = extrap(data['imp'], 0)
+
+# policy series - extrapolated
+pdata = {
+    'pol1': extrap(data['pol1'], data['pol1'][[-1], :]),
+    'pol2': extrap(data['pol2'], data['pol2'][[-1], :]),
+    'pol3': extrap(data['pol3'], data['pol3'][[-1], :]),
+}
+zbase = es.calc_zbar(params, pdata)
 
 ##
 ## simulate!
@@ -67,8 +83,7 @@ def sim_policy(act, cut, lag, tcase, kzone, vax):
     vrat = vax_rate if vax else 0
 
     # implement time lag
-    t_vec = np.arange(T)
-    zbar_vec = np.where(t_vec > lag, zbar, 0)
+    zbar_vec = np.where(t_vec > lag, zbar, zbase)
     zcut_vec = np.where(t_vec > lag, zcut, 0)
     kzon_vec = np.where(t_vec > lag, kval, 0)
     vax_vec = np.where(t_vec > vax_time, vrat, 0)
@@ -80,14 +95,14 @@ def sim_policy(act, cut, lag, tcase, kzone, vax):
         'kz': kzon_vec,
         'vx': vax_vec,
     }
-    simul = es.gen_jit(params, policy, state, T)
+    simul, _ = es.gen_jit(params, policy, state, impul, T, K)
 
     # maybe swap in true cases
     if tcase:
         simul['c'] = simul['ki']
 
-    return pd.DataFrame(
-        {k: simul[k] for k in ['c', 'd', 'act', 'out']}, index=dates
+    return es.framify(
+        {k: simul[k].copy() for k in ['c', 'd', 'act', 'out']}, dates, fips
     )
 
 ##
@@ -116,7 +131,7 @@ class PolicyHandler(tornado.web.RequestHandler):
 
         # render output
         ch = es.outcome_summary(
-            sim_df, c_lim=500, d_lim=12,
+            sim_df, c_lim=400, d_lim=8,
             hspacing=20, vspacing=40, color='#bbbbbb',
         )
 

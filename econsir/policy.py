@@ -26,24 +26,29 @@ hard_default = {
     'vx': 0,
 }
 
-def welfare_path(par, sim, disc, long_run, T):
+def welfare_path(par, sim, wgt, disc, long_run, T, K):
+    # params
+    ψ = np.atleast_2d(par['ψ']) # optional county dependence
+    wgt1 = wgt/np.sum(wgt) # to distribution
+
     # discounting
     ydelt = 1/year_days
     ytvec = np.arange(T)/year_days
     down = np.exp(-disc*ytvec)
 
     # input factors
-    out = sim['out'][:T]
-    irate = np.diff(sim['ka'][:T])
-    irate = np.concatenate([irate, irate[-1:]])
+    out = sim['out'][:T, :]
+    irate = np.diff(sim['ka'][:T, :], axis=0)
+    irate = np.concatenate([irate, irate[-1:, :]], axis=0)
 
     # immediate welfare
-    util = out - par['ψ']*irate
-    welf0 = (ydelt*down*util).sum()
+    util = out - ψ*irate
+    eutil = np.sum(util*wgt1[None, :], axis=1)
+    welf0 = (ydelt*down*eutil).sum()
 
     # total welfare
     if long_run:
-        welf1 = (down[-1]*util[-1])/disc
+        welf1 = (down[-1]*eutil[-1])/disc
         welf = disc*(welf0 + welf1)
     else:
         Ty = T/year_days
@@ -51,20 +56,37 @@ def welfare_path(par, sim, disc, long_run, T):
 
     return welf
 
-def welfare(pol, par, st0, disc, long_run, T):
-    sim = gen_path(par, pol, st0, T)
-    return welfare_path(par, sim, disc, long_run, T)
+def welfare(pol, par, st0, imp, wgt, disc, long_run, T, K):
+    sim, _ = gen_path(par, pol, st0, imp, T, K)
+    welf = welfare_path(par, sim, wgt, disc, long_run, T, K)
+    return welf
 
-def eval_policy(pol, par, st0, T, disc=0.05, long_run=True):
+def eval_policy(pol, par, st0=None, imp=None, wgt=None, T=None, K=None, disc=0.05, long_run=True):
+    if st0 is None:
+        st0 = zero_state(K)
+    if imp is None:
+        imp = np.zeros((T, K))
+    if wgt is None:
+        wgt = np.ones(K)
+
     pol = {**pol0, **pol}
-    sim = gen_jit(par, pol, st0, T)
-    return welfare_path(par, sim, disc, long_run, T)
+    sim, _ = gen_jit(par, pol, st0, imp, T, K)
+    welf = welfare_path(par, sim, wgt, disc, long_run, T, K)
+
+    return welf
 
 def print_policy(j, val, pol):
     pstr = ', '.join(f'{k}={np.mean(v):.4f}' for k, v in pol.items())
     print(f'[{j:5d}] {val:.4f}: {pstr}')
 
-def optimal_policy(pol, par, st0, T=365, disc=0.05, long_run=False, hard_policy=hard_default, optim='adam', **kwargs):
+def optimal_policy(pol, par, st0=None, imp=None, wgt=None, T=None, K=None, disc=0.05, long_run=False, hard_policy=hard_default, optim='adam', **kwargs):
+    if st0 is None:
+        st0 = zero_state(K)
+    if imp is None:
+        imp = np.zeros((T, K))
+    if wgt is None:
+        wgt = np.ones(K)
+
     if optim == 'rmsprop':
         opter = rmsprop
     elif optim == 'adam':
@@ -72,7 +94,7 @@ def optimal_policy(pol, par, st0, T=365, disc=0.05, long_run=False, hard_policy=
 
     def objective(lpol):
         pol = trans_args(lpol, spec_policy, hard_policy)
-        return welfare(pol, par, st0, disc, long_run, T)
+        return welfare(pol, par, st0, imp, wgt, disc, long_run, T, K)
 
     def printer(j, val, lpol):
         pol = trans_args(lpol, spec_policy, hard_policy)

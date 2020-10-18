@@ -2,6 +2,8 @@ import jax
 import jax.numpy as np
 from jax.tree_util import tree_map, tree_leaves
 import toml
+import numpy as np0
+import pandas as pd
 
 ##
 ## toml tools
@@ -32,6 +34,29 @@ def load_args(path):
         arg = toml.load(fid)
     arg1 = {k: make_arg(v) for k, v in arg.items()}
     return arg1
+
+##
+## matrix tools
+##
+
+def framify(d, index, columns):
+    if not isinstance(index, pd.Index):
+        index = pd.DatetimeIndex(index, name='date')
+    if not isinstance(columns, pd.Index):
+        columns = pd.Index(columns, name='county_fips')
+    return pd.concat({
+        k: pd.DataFrame(
+            v.copy(), index=index, columns=columns
+        ) for k, v in d.items() if np.ndim(v) == 2
+    }, axis=1)
+
+def one_hot(index, value=1, T=None):
+    if T is None:
+        T = np0.max(index)
+    K = len(index)
+    mat = np0.zeros((T, K))
+    mat[index, np0.arange(K)] = value
+    return mat
 
 ##
 ## argument transformations
@@ -195,4 +220,8 @@ def log(x):
 
 def gaussian_err(dat, sim, sig):
     lik = - log(sig) - 0.5*((dat-sim)/sig)**2
+    return np.mean(lik)
+
+def poisson_err(dat, sim, n):
+    lik = n * ( dat * log(sim) - sim )
     return np.mean(lik)

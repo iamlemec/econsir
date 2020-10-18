@@ -5,7 +5,7 @@ from jax.scipy.special import ndtr
 
 import pandas as pd
 
-from .tools import load_args, log, eps
+from .tools import load_args, framify, log, eps
 
 # β - transmission rate
 # λ - infection rate
@@ -43,6 +43,24 @@ def killzone(x, k, eps=1e-6):
 
 # core SIR model
 def sir(par, st, tv):
+    # params
+    β = par['β']
+    λ = par['λ']
+    γ = par['γ']
+    δ = par['δ']
+    κ = par['κ']
+    ψ = par['ψ']
+    σ = par['σ']
+    ρ = par['ρ']
+    ϝ = par['ϝ']
+    zi = par['zi']
+    p0 = par['p0']
+    pr = par['pr']
+    β0 = par['β0']
+    βr = par['βr']
+    ψ0 = par['ψ0']
+    ψr = par['ψr']
+
     # current state
     s = st['s']
     a = st['a']
@@ -55,26 +73,12 @@ def sir(par, st, tv):
     e = st['e']
     t = st['t']
 
-    # params
-    β = par['β']
-    λ = par['λ']
-    γ = par['γ']
-    δ = par['δ']
-    κ = par['κ']
-    ψ = par['ψ']
-    σ = par['σ']
-    ρ = par['ρ']
-    p0 = par['p0']
-    pr = par['pr']
-    β0 = par['β0']
-    βr = par['βr']
-    ψ0 = par['ψ0']
-    ψr = par['ψr']
+    # impulse
+    im = tv['im']
 
     # policy
-    zi = par['zi']
-    zc = tv['zc']
     zb = tv['zb']
+    zc = tv['zc']
     kz = tv['kz']
     vx = tv['vx']
 
@@ -87,7 +91,7 @@ def sir(par, st, tv):
 
     # time varying params
     p = p0 + (1-p0)*smoothstep(pr*t)
-    βs = β0 + (1-β0)*smoothstep(βr*t)
+    βs = 1 - β0*smoothstep(βr*t)
     ψs = ψ0 + (1-ψ0)*smoothstep(ψr*t)
 
     # effective params
@@ -128,17 +132,30 @@ def sir(par, st, tv):
     de = ρ*(sact-e)
     dt = 1
 
+    # discrete jumps
+    im1 = im/p
+    js = -(1+ϝ)*im1
+    ja = ϝ*im1
+    ji = im1
+    jr = 0
+    jd = 0
+    jc = im
+    jka = ϝ*im1
+    jki = im1
+    je = 0
+    jt = 0
+
     # updates
-    sp = s + ds
-    ap = a + da
-    ip = i + di
-    rp = r + dr
-    dp = d + dd
-    cp = c + dc
-    kap = ka + dka
-    kip = ki + dki
-    ep = e + de
-    tp = t + dt
+    sp = s + ds + js
+    ap = a + da + ja
+    ip = i + di + ji
+    rp = r + dr + jr
+    dp = d + dd + jd
+    cp = c + dc + jc
+    kap = ka + dka + jka
+    kip = ki + dki + jki
+    ep = e + de + je
+    tp = t + dt + jt
 
     # da kill zone
     zz = np.where(kz > 0, killzone(ap+ip, kz), 1)
@@ -171,39 +188,37 @@ def sir(par, st, tv):
     return stp, xt
 
 # iterate SIR for path
-def gen_path(par, pol, st0, T):
+def gen_path(par, pol, st0, imp, T, K):
     tv = {
-        'zb': pol['zb']*np.ones(T),
-        'zc': pol['zc']*np.ones(T),
-        'kz': pol['kz']*np.ones(T),
-        'vx': pol['vx']*np.ones(T),
+        'zb': pol['zb']*np.ones((T, 1)),
+        'zc': pol['zc']*np.ones((T, 1)),
+        'kz': pol['kz']*np.ones((T, 1)),
+        'vx': pol['vx']*np.ones((T, 1)),
+        'im': imp,
     }
 
     sf = jax.partial(sir, par)
     last, path = lax.scan(sf, st0, tv)
 
-    return {k: v.T for k, v in path.items()}
+    return path, last
 
 # null state
-def zero_state(par):
-    i = par['i0']/1e6
-    ϝ = np.maximum(0, (par['β']+par['δ']+par['κ']-par['λ']-par['γ'])/par['λ'])
-    p0 = par['p0']
+def zero_state(K):
     return {
-        's': 1.0 - (1+ϝ)*i,
-        'a': ϝ*i,
-        'i': i,
-        'r': 0.0,
-        'd': 0.0,
-        'c': p0*i,
-        'ka': ϝ*i,
-        'ki': i,
-        'e': 1.0,
-        't': 0.0,
+        's': np.ones(K),
+        'a': np.zeros(K),
+        'i': np.zeros(K),
+        'r': np.zeros(K),
+        'd': np.zeros(K),
+        'c': np.zeros(K),
+        'ka': np.zeros(K),
+        'ki': np.zeros(K),
+        'e': np.ones(K),
+        't': 0,
     }
 
 # compiled simulator
-gen_jit = jax.jit(gen_path, static_argnums=(3,))
+gen_jit = jax.jit(gen_path, static_argnums=(4, 5))
 
 # default policy
 pol0 = {
@@ -214,17 +229,20 @@ pol0 = {
 }
 
 # simple interface
-def simulate_path(par, pol={}, st0=None, T=365, date='2020-02-15', frame=True):
+def simulate_path(par, pol={}, st0=None, imp=None, K=10, T=365, locs=None, date='2020-02-01', frame=True):
     if type(par) is str:
         par = load_args(par)
     if st0 is None:
-        st0 = zero_state(par)
+        st0 = zero_state(K)
+    if imp is None:
+        imp = np.zeros((T, K))
 
     pol = {**pol0, **pol}
-    sim = gen_jit(par, pol, st0, T)
+    sim, last = gen_jit(par, pol, st0, imp, T, K)
 
     if frame:
         index = pd.date_range(date, periods=T, freq='d', name='date')
-        return pd.DataFrame(sim, index=index)
+        columns = np.arange(K) if locs is None else locs
+        return framify(sim, index, columns), last
     else:
-        return sim
+        return sim, last

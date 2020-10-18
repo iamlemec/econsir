@@ -4,7 +4,10 @@ import jax.numpy as np
 import pandas as pd
 
 from .model import zero_state, gen_path
-from .tools import load_args, save_args, trans_args, rtrans_args, rmsprop, adam, gaussian_err
+from .tools import (
+    load_args, save_args, trans_args, rtrans_args,
+    rmsprop, adam, gaussian_err, poisson_err,
+)
 
 ##
 ## estimation
@@ -17,6 +20,7 @@ spec_params = {
     'λ': 'log',
     'δ': 'log',
     'κ': 'log',
+    'ϝ': 'log',
     'ψ': 'log',
     'σ': 'log',
     'ρ': 'log',
@@ -24,68 +28,73 @@ spec_params = {
     'pr': 'log',
     'β0': 'logit',
     'βr': 'log',
-    'ψ0': 'logit',
+    'ψ0': 'log',
     'ψr': 'log',
-    'i0': 'log',
     'zi': 'log',
     'zb1': 'log',
     'zb2': 'log',
     'zb3': 'log',
-    'σc': 'log',
-    'σd': 'log',
     'σa': 'log',
     'σo': 'log',
 }
 
 # map from policy data to z levels
-def calc_policy(pol1, pol2, pol3, zb1, zb2, zb3):
-    return pol1*(1-pol2)*(1-pol3)*zb1 + pol2*(1-pol3)*zb2 + pol3*zb3
-
-def likelihood(par, dat, T):
-    st0 = zero_state(par)
-    zb0 = calc_policy(
-        dat['pol1'], dat['pol2'], dat['pol3'],
-        par['zb1'], par['zb2'], par['zb3'],
+def calc_zbar(par, dat):
+    return (
+          dat['pol1']*(1-dat['pol2'])*(1-dat['pol3'])*par['zb1']
+        + dat['pol2']*(1-dat['pol3'])*par['zb2']
+        + dat['pol3']*par['zb3']
     )
 
-    # run simulation
+def likelihood(par, dat):
+    T, K = dat['T'], dat['K']
+
+    # compute policy
+    zb0 = calc_zbar(par, dat)
     pol = {'zb': zb0, 'zc': 0, 'kz': 0, 'vx': 0}
-    sim = gen_path(par, pol, st0, T)
+
+    # tabulate state
+    st0 = zero_state(K)
+    imp = dat['imp']
+
+    # run simulation
+    sim, _ = gen_path(par, pol, st0, imp, T, K)
 
     # extract simulation
-    sim_c = 1e6*sim['c']
-    sim_d = 1e6*sim['d']
-    sim_a = 1e2*sim['act']
-    sim_o = 1e2*sim['out']
+    sim_c = sim['c']
+    sim_d = sim['d']
+    sim_a = sim['act']
+    sim_o = sim['out']
 
     # extract data
-    dat_c = 1e6*dat['c']
-    dat_d = 1e6*dat['d']
-    dat_a = 1e2*dat['act']
-    dat_o = 1e2*dat['out']
+    dat_c = dat['c']
+    dat_d = dat['d']
+    dat_a = dat['act']
+    dat_o = dat['out']
 
     # get daily rates
-    sim_c = np.diff(sim_c)
-    sim_d = np.diff(sim_d)
-    dat_c = np.diff(dat_c)
-    dat_d = np.diff(dat_d)
+    sim_c = np.diff(sim_c, axis=0)
+    sim_d = np.diff(sim_d, axis=0)
+    dat_c = np.diff(dat_c, axis=0)
+    dat_d = np.diff(dat_d, axis=0)
 
     # actual standard deviations
-    sig_c = par['σc']
-    sig_d = par['σd']
-    sig_a = par['σa']
-    sig_o = par['σo']
+    wgt0 = dat['wgt'][None, :]
+    wgt1 = wgt0/np.mean(wgt0)
+    sig_0 = 1/np.sqrt(wgt1)
+    sig_a = sig_0*par['σa']
+    sig_o = sig_0*par['σo']
 
     # epi match
-    lik_c = gaussian_err(dat_c, sim_c, sig_c)
-    lik_d = gaussian_err(dat_d, sim_d, sig_d)
+    lik_c = poisson_err(dat_c, sim_c, wgt0)
+    lik_d = poisson_err(dat_d, sim_d, wgt0)
 
     # econ match
     lik_a = gaussian_err(dat_a, sim_a, sig_a)
     lik_o = gaussian_err(dat_o, sim_o, sig_o)
 
     # sum it all up
-    lik = lik_c + lik_d + lik_a + lik_o
+    lik = 0.2*lik_c + 5*lik_d + lik_a + lik_o
 
     return lik
 
@@ -93,12 +102,7 @@ def print_params(j, val, par):
     pstr = ', '.join(f'{k}={np.mean(v):.4f}' for k, v in par.items())
     print(f'[{j:5d}] {val:.4f}: {pstr}')
 
-def estimate(dat, par, save=None, T=None, hard_params={}, optim='adam', **kwargs):
-    if type(dat) is str:
-        dat = load_data(dat)
-    if type(dat) is pd.DataFrame:
-        T = len(dat)
-        dat = {k: np.array(v) for k, v in dat.items()}
+def estimate(par, dat, hard_params={}, optim='adam', save=None, **kwargs):
     if type(par) is str:
         par = load_args(par)
 
@@ -109,7 +113,7 @@ def estimate(dat, par, save=None, T=None, hard_params={}, optim='adam', **kwargs
 
     def objective(lpar):
         par = trans_args(lpar, spec_params, hard_params)
-        return likelihood(par, dat, T)
+        return likelihood(par, dat)
 
     def printer(j, val, lpar):
         par = trans_args(lpar, spec_params, hard_params)

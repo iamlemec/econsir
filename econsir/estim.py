@@ -94,7 +94,7 @@ def likelihood(par, dat):
     lik_o = gaussian_err(dat_o, sim_o, sig_o)
 
     # sum it all up
-    lik = 0.2*lik_c + 5*lik_d + lik_a + lik_o
+    lik = lik_c + lik_d + lik_a + lik_o
 
     return lik
 
